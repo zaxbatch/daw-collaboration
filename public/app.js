@@ -1,5 +1,7 @@
 // Configuration
-const API_URL = window.location.origin;
+//const API_URL = window.location.origin;
+const API_URL = https://daw-studio-backend.onrender.com';
+
 let currentUser = null;
 let currentBeatId = null;
 let currentTrackNumber = null;
