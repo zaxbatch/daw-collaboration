@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 8-Track DAW Collaboration Studio</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">🎵 8-Track DAW Collaboration Studio</div>
+            <div class="search-bar">
+                <input type="text" id="globalSearch" placeholder="Search users..." onkeyup="handleGlobalSearch(event)">
+                <div id="searchResults" class="search-results"></div>
+            </div>
+            <div id="authSection"></div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="nav-tabs" id="navTabs">
+            <div class="nav-tab active" data-page="feed">📱 Feed</div>
+            <div class="nav-tab" data-page="discover">🔍 Discover</div>
+            <div class="nav-tab" data-page="trending">🔥 Trending</div>
+            <div class="nav-tab" data-page="leaderboard">🏆 Leaderboard</div>
+            <div class="nav-tab" data-page="studio">🎙️ 8-Track Studio</div>
+            <div class="nav-tab" data-page="upload">📤 Upload Beat</div>
+            <div class="nav-tab" data-page="profile">👤 Profile</div>
+        </div>
+
+        <!-- Content Pages -->
+        <div class="content">
+            <!-- Feed Page -->
+            <div id="feedPage" class="page active">
+                <h2>Your Feed</h2>
+                <div id="feedContent"></div>
+            </div>
+
+            <!-- Discover Page -->
+            <div id="discoverPage" class="page">
+                <h2>Discover Music</h2>
+                <div class="filters">
+                    <select id="discoverGenre" onchange="discoverMusic()">
+                        <option value="all">All Genres</option>
+                        <option value="Hip Hop">Hip Hop</option>
+                        <option value="R&B">R&B</option>
+                        <option value="Pop">Pop</option>
+                        <option value="Rock">Rock</option>
+                        <option value="Electronic">Electronic</option>
+                        <option value="Jazz">Jazz</option>
+                    </select>
+                    <select id="discoverSort" onchange="discoverMusic()">
+                        <option value="newest">Newest</option>
+                        <option value="popular">Most Popular</option>
+                        <option value="most-downloaded">Most Downloaded</option>
+                    </select>
+                    <input type="text" id="discoverSearch" placeholder="Search beats..." onkeyup="discoverMusic()">
+                </div>
+                <div id="discoverContent" class="beats-grid"></div>
+            </div>
+
+            <!-- Trending Page -->
+            <div id="trendingPage" class="page">
+                <h2>Trending Now</h2>
+                <div id="trendingContent"></div>
+            </div>
+
+            <!-- Leaderboard Page -->
+            <div id="leaderboardPage" class="page">
+                <h2>Top Creators</h2>
+                <div id="leaderboardContent"></div>
+            </div>
+
+            <!-- 8-Track Studio Page -->
+            <div id="studioPage" class="page">
+                <h2>🎙️ 8-Track Recording Studio</h2>
+                <div id="studioContent">
+                    <div class="studio-selector">
+                        <h3>Select a Beat to Record On</h3>
+                        <div id="beatSelector" class="beats-grid" style="max-height: 400px; overflow-y: auto;"></div>
+                    </div>
+                    <div id="multiTrackStudio" style="display: none;">
+                        <div class="studio-controls">
+                            <button onclick="saveMultiTrackSession()" class="btn-primary">💾 Save Session</button>
+                            <button onclick="exportMixedAudio()" class="btn-primary">🎧 Export Mixed Audio</button>
+                            <button onclick="clearAllTracks()" class="btn-danger">🗑️ Clear All Tracks</button>
+                            <button onclick="closeStudio()" class="btn-secondary">Close Studio</button>
+                        </div>
+                        <div id="trackContainer" class="track-container"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Beat Page -->
+            <div id="uploadPage" class="page">
+                <h2>Upload Your Beat</h2>
+                <div class="upload-form">
+                    <input type="text" id="beatTitle" placeholder="Beat Title" required>
+                    <select id="beatGenre">
+                        <option value="Hip Hop">Hip Hop</option>
+                        <option value="R&B">R&B</option>
+                        <option value="Pop">Pop</option>
+                        <option value="Rock">Rock</option>
+                        <option value="Electronic">Electronic</option>
+                        <option value="Jazz">Jazz</option>
+                    </select>
+                    <input type="number" id="beatBpm" placeholder="BPM" required>
+                    <input type="text" id="beatTags" placeholder="Tags (comma separated: chill, trap, lo-fi)">
+                    <textarea id="beatDescription" rows="3" placeholder="Description"></textarea>
+                    <input type="file" id="beatFile" accept="audio/*" required>
+                    <button onclick="uploadBeat()" class="btn-primary">Upload Beat</button>
+                </div>
+            </div>
+
+            <!-- Profile Page -->
+            <div id="profilePage" class="page">
+                <div id="profileContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Multi-Track Recording Modal -->
+    <div id="recordTrackModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">🎙️ Record Track <span id="trackNumber"></span></div>
+            <div id="trackRecordInfo"></div>
+            
+            <div class="daw-controls">
+                <h3>Record Your Part</h3>
+                <button id="startTrackRecordingBtn" class="btn-primary" onclick="startTrackRecording()">🔴 Start Recording</button>
+                <button id="stopTrackRecordingBtn" class="btn-secondary" onclick="stopTrackRecording()" style="display:none;">⏹️ Stop Recording</button>
+                <div id="trackRecordingTimer" style="margin: 10px 0; font-size: 24px; font-weight: bold; text-align: center;">00:00</div>
+                <audio id="recordedTrackAudio" controls style="display:none; width: 100%; margin: 10px 0;"></audio>
+                
+                <hr style="margin: 20px 0;">
+                
+                <h3>Or Upload Audio File</h3>
+                <input type="file" id="trackAudioFile" accept="audio/*" onchange="handleTrackFileUpload()">
+            </div>
+            
+            <input type="text" id="trackName" placeholder="Track Name (e.g., Verse 1, Chorus, Ad-libs)">
+            
+            <div style="margin-top: 20px;">
+                <button onclick="saveTrackRecording()" class="btn-primary">Save to Track</button>
+                <button onclick="closeModal('recordTrackModal')" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Beat Detail Modal -->
+    <div id="beatModal" class="modal">
+        <div class="modal-content" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
+            <div id="beatDetail"></div>
+            <button onclick="closeModal('beatModal')" class="btn-secondary" style="margin-top: 20px;">Close</button>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Login</div>
+            <input type="email" id="loginEmail" placeholder="Email">
+            <input type="password" id="loginPassword" placeholder="Password">
+            <button onclick="login()" class="btn-primary">Login</button>
+            <button onclick="closeModal('loginModal')" class="btn-secondary">Close</button>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Register</div>
+            <input type="text" id="regUsername" placeholder="Username">
+            <input type="email" id="regEmail" placeholder="Email">
+            <input type="text" id="regDisplayName" placeholder="Display Name">
+            <textarea id="regBio" rows="2" placeholder="Bio (optional)"></textarea>
+            <input type="password" id="regPassword" placeholder="Password">
+            <button onclick="register()" class="btn-primary">Register</button>
+            <button onclick="closeModal('registerModal')" class="btn-secondary">Close</button>
+        </div>
+    </div>
+
+    <script src="./app.js"></script>
+</body>
+</html>
