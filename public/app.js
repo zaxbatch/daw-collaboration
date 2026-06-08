@@ -1,7 +1,5 @@
 // Configuration
 const API_URL = window.location.origin;
-//const API_URL = 'https://daw-collaboration.onrender.com/';
-
 let currentUser = null;
 let currentBeatId = null;
 let currentTrackNumber = null;
@@ -32,7 +30,7 @@ let audioContext = null;
 let trackSources = [];
 let recordingStream = null;
 
-// Initialize 8 tracks (0 = beat track, 1-7 = recording tracks)
+// Initialize 8 tracks
 function initTracks() {
     currentSession.tracks = [];
     for (let i = 0; i < 8; i++) {
@@ -285,38 +283,6 @@ async function deleteRecording(recordingId) {
             viewBeat(currentBeatId);
         }
         if (currentUser) loadProfile(currentUser.username);
-    } catch (error) {
-        alert(error.message);
-    }
-}
-
-async function deleteAccount() {
-    if (!confirm('WARNING: This will permanently delete your account and ALL your content. Type "DELETE" to confirm.')) {
-        const confirmation = prompt('Type "DELETE" to confirm:');
-        if (confirmation !== 'DELETE') {
-            alert('Account deletion cancelled');
-            return;
-        }
-    }
-    
-    try {
-        const token = localStorage.getItem('token');
-        const response = await fetch(`${API_URL}/api/users/${currentUser.id}`, {
-            method: 'DELETE',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Delete failed');
-        }
-        
-        localStorage.removeItem('token');
-        currentUser = null;
-        updateUI();
-        showPage('discover');
-        discoverMusic();
-        alert('Account deleted successfully');
     } catch (error) {
         alert(error.message);
     }
@@ -637,12 +603,40 @@ async function viewBeat(beatId) {
     }
 }
 
+// FIXED: Download beat with authentication
 async function downloadBeat(beatId) {
+    if (!currentUser) {
+        alert('Please login to download beats');
+        return;
+    }
+    
     try {
         const token = localStorage.getItem('token');
-        window.open(`${API_URL}/api/beats/${beatId}/download?token=${token}`, '_blank');
+        // Use fetch with authentication instead of window.open
+        const response = await fetch(`${API_URL}/api/beats/${beatId}/download`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Download failed');
+        }
+        
+        // Get the blob and create download link
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `beat_${beatId}.mp3`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        alert('Download started!');
     } catch (error) {
-        alert('Error downloading beat');
+        alert(error.message);
     }
 }
 
@@ -667,42 +661,54 @@ async function voteForRecording(recordingId) {
     }
 }
 
-// ==================== 8-TRACK DAW STUDIO WITH PROPER RECORDING ====================
+// ==================== FIXED 8-TRACK DAW STUDIO ====================
 
 async function loadBeatsForStudio() {
     try {
         const beats = await apiCall('/api/beats?sort=newest');
         const beatSelector = document.getElementById('beatSelector');
         
+        if (!beatSelector) return;
+        
+        if (!beats || beats.length === 0) {
+            beatSelector.innerHTML = '<p>No beats available. Upload a beat first!</p>';
+            return;
+        }
+        
         beatSelector.innerHTML = beats.slice(0, 12).map(beat => `
-            <div class="beat-card" onclick="openMultiTrackStudio('${beat.id}', '${escapeHtml(beat.title)}', '${API_URL}${beat.fileUrl}')">
+            <div class="beat-card">
                 <div class="beat-title">${escapeHtml(beat.title)}</div>
                 <div class="beat-info">by ${escapeHtml(beat.producerName)}</div>
                 <div class="beat-info">${beat.genre} • ${beat.bpm} BPM</div>
                 <audio controls onclick="event.stopPropagation()">
                     <source src="${API_URL}${beat.fileUrl}" type="audio/mpeg">
                 </audio>
-                <button class="btn-primary" style="margin-top: 10px;" onclick="event.stopPropagation(); openMultiTrackStudio('${beat.id}', '${escapeHtml(beat.title)}', '${API_URL}${beat.fileUrl}')">
+                <button class="btn-primary" style="margin-top: 10px; width: 100%;" onclick="event.stopPropagation(); openMultiTrackStudio('${beat.id}', '${escapeHtml(beat.title)}', '${API_URL}${beat.fileUrl}')">
                     🎙️ Open in 8-Track Studio
                 </button>
             </div>
         `).join('');
     } catch (error) {
         console.error('Error loading beats for studio:', error);
+        const beatSelector = document.getElementById('beatSelector');
+        if (beatSelector) {
+            beatSelector.innerHTML = '<p>Error loading beats. Please make sure you are logged in.</p>';
+        }
     }
 }
 
+// FIXED: Open studio with better error handling
 async function openMultiTrackStudio(beatId, beatTitle, beatUrl) {
     if (!currentUser) {
         alert('Please login to use the studio');
         return;
     }
     
+    console.log('Opening studio for beat:', beatId, beatTitle);
+    
     // Stop any playing audio
-    stopPlayback();
-    if (isRecording) {
-        stopRecording();
-    }
+    if (isPlaying) stopPlayback();
+    if (isRecording) stopRecordingToTrack(currentTrackNumber);
     
     // Close existing audio context
     if (audioContext) {
@@ -722,7 +728,10 @@ async function openMultiTrackStudio(beatId, beatTitle, beatUrl) {
     
     // Load beat into track 0
     try {
+        console.log('Loading beat from:', beatUrl);
         const response = await fetch(beatUrl);
+        if (!response.ok) throw new Error('Failed to load beat file');
+        
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
         
@@ -732,55 +741,62 @@ async function openMultiTrackStudio(beatId, beatTitle, beatUrl) {
         currentSession.tracks[0].isLoaded = true;
         currentSession.tracks[0].volume = 0.8;
         
+        // Hide selector, show studio
+        const studioSelector = document.querySelector('.studio-selector');
+        const multiTrackStudio = document.getElementById('multiTrackStudio');
+        
+        if (studioSelector) studioSelector.style.display = 'none';
+        if (multiTrackStudio) multiTrackStudio.style.display = 'block';
+        
         renderTrackInterface();
         drawWaveform(0, audioBuffer);
+        
+        console.log('Studio opened successfully');
     } catch (error) {
         console.error('Error loading beat:', error);
-        alert('Error loading beat file');
+        alert('Error loading beat file: ' + error.message);
     }
-    
-    // Hide selector, show studio
-    document.querySelector('.studio-selector').style.display = 'none';
-    document.getElementById('multiTrackStudio').style.display = 'block';
 }
 
 function renderTrackInterface() {
     const trackContainer = document.getElementById('trackContainer');
+    if (!trackContainer) return;
     
     trackContainer.innerHTML = `
         <div class="transport-controls" style="background: #1a1a1a; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; gap: 15px; justify-content: center;">
             <button id="playBtn" onclick="startPlayback()" class="btn-primary" style="font-size: 18px; padding: 10px 30px;">▶️ Play All Tracks</button>
             <button id="stopBtn" onclick="stopPlayback()" class="btn-secondary" style="font-size: 18px; padding: 10px 30px;">⏹️ Stop</button>
+            <div id="recordingTimerDisplay" style="color: white; font-size: 18px; padding: 10px 20px; background: #333; border-radius: 8px;">Ready</div>
         </div>
         ${currentSession.tracks.map(track => `
-            <div class="track" data-track-id="${track.id}" style="opacity: ${track.muted ? 0.5 : 1}">
-                <div class="track-header">
-                    <div class="track-number">Track ${track.id === 0 ? 'BEAT' : track.id}</div>
-                    <input type="text" class="track-name-input" value="${escapeHtml(track.name)}" 
+            <div class="track" data-track-id="${track.id}" style="opacity: ${track.muted ? 0.5 : 1}; background: #2a2a2a; border-radius: 8px; margin-bottom: 15px; padding: 15px;">
+                <div class="track-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+                    <div class="track-number" style="font-size: 18px; font-weight: bold; color: #667eea;">Track ${track.id === 0 ? 'BEAT' : track.id}</div>
+                    <input type="text" class="track-name-input" value="${escapeHtml(track.name)}" style="background: #444; color: white; border: 1px solid #667eea; padding: 5px 10px; border-radius: 5px;"
                            onchange="updateTrackName(${track.id}, this.value)">
-                    <div class="track-controls">
+                    <div class="track-controls" style="display: flex; gap: 10px;">
                         ${track.id !== 0 ? `
-                            <button id="recordBtn-${track.id}" class="track-btn track-record" onclick="startRecordingToTrack(${track.id})" style="${track.isLoaded ? 'background: #f44336;' : 'opacity:0.5;'}">
+                            <button id="recordBtn-${track.id}" class="track-btn track-record" onclick="startRecordingToTrack(${track.id})" style="background: #f44336; color: white; padding: 5px 15px; border: none; border-radius: 5px; cursor: pointer;">
                                 🔴 Record
                             </button>
-                            <button class="track-btn track-clear" onclick="clearTrack(${track.id})">🗑️ Clear</button>
+                            <button class="track-btn track-clear" onclick="clearTrack(${track.id})" style="background: #ff9800; color: white; padding: 5px 15px; border: none; border-radius: 5px; cursor: pointer;">🗑️ Clear</button>
                         ` : ''}
                     </div>
                 </div>
                 
-                <div class="track-waveform" id="waveform-container-${track.id}">
-                    <canvas id="waveform-${track.id}" width="100%" height="60"></canvas>
-                    ${track.id !== 0 && !track.isLoaded ? '<div style="position: absolute; color: #666; margin-top: 20px;">Click record to record or load audio</div>' : ''}
+                <div class="track-waveform" id="waveform-container-${track.id}" style="height: 60px; background: #1a1a1a; border-radius: 5px; margin: 10px 0; position: relative; cursor: pointer;">
+                    <canvas id="waveform-${track.id}" width="100%" height="60" style="width: 100%; height: 60px;"></canvas>
+                    ${track.id !== 0 && !track.isLoaded ? '<div style="position: absolute; color: #666; top: 20px; left: 20px;">Click record to record or load audio</div>' : ''}
                 </div>
                 
-                <div class="track-volume">
+                <div class="track-volume" style="margin: 10px 0; display: flex; align-items: center; gap: 10px; color: white;">
                     <span>🔊</span>
-                    <input type="range" min="0" max="1" step="0.01" value="${track.volume}" 
+                    <input type="range" min="0" max="1" step="0.01" value="${track.volume}" style="width: 100px;"
                            onchange="updateTrackVolume(${track.id}, this.value)">
-                    <button class="track-btn track-solo" onclick="toggleSolo(${track.id})" style="background: ${track.solo ? '#4CAF50' : '#666'}">
+                    <button class="track-btn track-solo" onclick="toggleSolo(${track.id})" style="background: ${track.solo ? '#4CAF50' : '#666'}; color: white; padding: 5px 15px; border: none; border-radius: 5px; cursor: pointer;">
                         ${track.solo ? '🔊 Solo' : 'Solo'}
                     </button>
-                    <button class="track-btn track-mute" onclick="toggleMute(${track.id})" style="background: ${track.muted ? '#f44336' : '#666'}">
+                    <button class="track-btn track-mute" onclick="toggleMute(${track.id})" style="background: ${track.muted ? '#f44336' : '#666'}; color: white; padding: 5px 15px; border: none; border-radius: 5px; cursor: pointer;">
                         ${track.muted ? '🔇 Muted' : 'Mute'}
                     </button>
                 </div>
@@ -792,7 +808,7 @@ function renderTrackInterface() {
                 ${track.id !== 0 && !track.isLoaded ? `
                     <input type="file" id="file-input-${track.id}" accept="audio/*" style="display: none;" 
                            onchange="loadTrackFile(${track.id}, this.files[0])">
-                    <button class="btn-secondary" style="margin-top: 10px; width: 100%;" onclick="document.getElementById('file-input-${track.id}').click()">
+                    <button class="btn-secondary" style="margin-top: 10px; width: 100%; padding: 8px; background: #f0f0f0; border: none; border-radius: 5px; cursor: pointer;" onclick="document.getElementById('file-input-${track.id}').click()">
                         📁 Or Upload Audio File
                     </button>
                 ` : ''}
@@ -907,15 +923,18 @@ function clearAllTracks() {
 function closeStudio() {
     if (confirm('Close studio? Unsaved recordings will be lost.')) {
         if (isRecording) {
-            stopRecording();
+            stopRecordingToTrack(currentTrackNumber);
         }
         stopPlayback();
         if (audioContext) {
             audioContext.close();
             audioContext = null;
         }
-        document.querySelector('.studio-selector').style.display = 'block';
-        document.getElementById('multiTrackStudio').style.display = 'none';
+        const studioSelector = document.querySelector('.studio-selector');
+        const multiTrackStudio = document.getElementById('multiTrackStudio');
+        
+        if (studioSelector) studioSelector.style.display = 'block';
+        if (multiTrackStudio) multiTrackStudio.style.display = 'none';
         initTracks();
     }
 }
@@ -1038,7 +1057,7 @@ function stopPlayback() {
     if (playBtn) playBtn.textContent = '▶️ Play All Tracks';
 }
 
-// ==================== PROPER RECORDING WITH BEAT PLAYBACK ====================
+// ==================== RECORDING WITH BEAT PLAYBACK ====================
 
 async function startRecordingToTrack(trackNumber) {
     if (!currentUser) {
@@ -1106,6 +1125,18 @@ async function startRecordingToTrack(trackNumber) {
                 recordingStream.getTracks().forEach(track => track.stop());
                 recordingStream = null;
             }
+            
+            // Update button
+            const recordBtn = document.getElementById(`recordBtn-${currentTrackNumber}`);
+            if (recordBtn) {
+                recordBtn.textContent = '🔴 Record';
+                recordBtn.style.background = '#f44336';
+                recordBtn.onclick = () => startRecordingToTrack(currentTrackNumber);
+            }
+            
+            // Clear timer display
+            const timerDisplay = document.getElementById('recordingTimerDisplay');
+            if (timerDisplay) timerDisplay.textContent = 'Ready';
         };
         
         // Start recording
@@ -1121,7 +1152,7 @@ async function startRecordingToTrack(trackNumber) {
         }
         
         // Start beat playback for monitoring
-        await startMonitoringPlayback();
+        startMonitoringPlayback();
         
         // Start timer
         recordingStartTime = Date.now();
@@ -1137,24 +1168,17 @@ async function startRecordingToTrack(trackNumber) {
     }
 }
 
-async function startMonitoringPlayback() {
-    // Create a monitoring mix so the vocalist can hear the beat while recording
-    if (!audioContext) return;
-    
-    const masterGain = audioContext.createGain();
-    masterGain.gain.value = 1;
-    masterGain.connect(audioContext.destination);
-    
-    // Play the beat track only (for monitoring)
+function startMonitoringPlayback() {
+    // Play the beat track only for monitoring while recording
     if (currentSession.tracks[0].audioBuffer && !currentSession.tracks[0].muted) {
         const beatSource = audioContext.createBufferSource();
         beatSource.buffer = currentSession.tracks[0].audioBuffer;
         
         const beatGain = audioContext.createGain();
-        beatGain.gain.value = currentSession.tracks[0].volume * 0.7; // Slightly lower for monitoring
+        beatGain.gain.value = currentSession.tracks[0].volume * 0.7;
         
         beatSource.connect(beatGain);
-        beatGain.connect(masterGain);
+        beatGain.connect(audioContext.destination);
         beatSource.start();
         
         // Store for cleanup
@@ -1208,7 +1232,7 @@ function startRecordingTimer() {
         const seconds = elapsed % 60;
         const timerDisplay = document.getElementById('recordingTimerDisplay');
         if (timerDisplay) {
-            timerDisplay.textContent = `Recording: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            timerDisplay.textContent = `🔴 Recording: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
     }, 1000);
 }
@@ -1403,42 +1427,44 @@ async function viewProfile(username) {
         
         const profileContent = document.getElementById('profileContent');
         profileContent.innerHTML = `
-            <div class="profile-header">
-                <div class="profile-avatar">${(user.displayName?.[0] || user.username?.[0]).toUpperCase()}</div>
-                <div class="profile-info">
-                    <div class="profile-name">${escapeHtml(user.displayName || user.username)}</div>
+            <div class="profile-header" style="display: flex; gap: 30px; margin-bottom: 30px; flex-wrap: wrap;">
+                <div class="profile-avatar" style="width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 48px; font-weight: bold;">
+                    ${(user.displayName?.[0] || user.username?.[0]).toUpperCase()}
+                </div>
+                <div class="profile-info" style="flex: 1;">
+                    <div class="profile-name" style="font-size: 32px; font-weight: bold; margin-bottom: 10px;">${escapeHtml(user.displayName || user.username)}</div>
                     <div>@${escapeHtml(user.username)}</div>
-                    <div class="profile-stats">
-                        <div class="stat">
-                            <div class="stat-number">${user.uploadedBeatsCount || 0}</div>
-                            <div class="stat-label">Beats</div>
+                    <div class="profile-stats" style="display: flex; gap: 20px; margin: 15px 0;">
+                        <div class="stat" style="text-align: center;">
+                            <div class="stat-number" style="font-size: 24px; font-weight: bold; color: #667eea;">${user.uploadedBeatsCount || 0}</div>
+                            <div class="stat-label" style="font-size: 12px; color: #666;">Beats</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-number">${user.recordingsCount || 0}</div>
-                            <div class="stat-label">Recordings</div>
+                            <div class="stat-number" style="font-size: 24px; font-weight: bold; color: #667eea;">${user.recordingsCount || 0}</div>
+                            <div class="stat-label" style="font-size: 12px; color: #666;">Recordings</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-number">${user.followers?.length || 0}</div>
-                            <div class="stat-label">Followers</div>
+                            <div class="stat-number" style="font-size: 24px; font-weight: bold; color: #667eea;">${user.followers?.length || 0}</div>
+                            <div class="stat-label" style="font-size: 12px; color: #666;">Followers</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-number">${user.points || 0}</div>
-                            <div class="stat-label">Points</div>
+                            <div class="stat-number" style="font-size: 24px; font-weight: bold; color: #667eea;">${user.points || 0}</div>
+                            <div class="stat-label" style="font-size: 12px; color: #666;">Points</div>
                         </div>
                     </div>
-                    ${user.bio ? `<div class="profile-bio">${escapeHtml(user.bio)}</div>` : ''}
+                    ${user.bio ? `<div class="profile-bio" style="margin: 15px 0; padding: 10px; background: #f5f5f5; border-radius: 8px;">${escapeHtml(user.bio)}</div>` : ''}
                     <div style="margin-top: 15px; display: flex; gap: 10px;">
                         ${currentUser && currentUser.id !== user.id ? 
-                            `<button onclick="followUser('${user.id}')" class="follow-btn">➕ Follow</button>` : ''}
+                            `<button onclick="followUser('${user.id}')" class="follow-btn" style="background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 25px; cursor: pointer;">➕ Follow</button>` : ''}
                         ${currentUser && currentUser.id === user.id ? 
-                            `<button onclick="deleteAccount()" class="btn-danger">🗑️ Delete Account</button>` : ''}
+                            `<button onclick="deleteAccount()" class="btn-danger" style="background: #ff4757; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer;">🗑️ Delete Account</button>` : ''}
                     </div>
                 </div>
             </div>
             <h3>Uploaded Beats</h3>
-            <div class="beats-grid">
+            <div class="beats-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
                 ${user.uploadedBeats?.map(beat => `
-                    <div class="beat-card" onclick="viewBeat('${beat.id}')">
+                    <div class="beat-card" onclick="viewBeat('${beat.id}')" style="background: #f9f9f9; border-radius: 10px; padding: 20px; cursor: pointer;">
                         <div class="beat-title">${escapeHtml(beat.title)}</div>
                         <div class="beat-info">${beat.genre} • ${beat.bpm} BPM</div>
                         <audio controls onclick="event.stopPropagation()">
@@ -1455,7 +1481,7 @@ async function viewProfile(username) {
             <h3>Recordings</h3>
             <div class="beats-grid">
                 ${user.recordings?.map(recording => `
-                    <div class="beat-card" onclick="viewRecording('${recording.id}')">
+                    <div class="beat-card" onclick="viewRecording('${recording.id}')" style="background: #f9f9f9; border-radius: 10px; padding: 20px; cursor: pointer;">
                         <div class="beat-title">${escapeHtml(recording.title)}</div>
                         <div class="beat-info">⭐ ${recording.rating?.toFixed(1) || 0}/5</div>
                         <audio controls onclick="event.stopPropagation()">
@@ -1526,8 +1552,10 @@ async function handleGlobalSearch(event) {
         }
         
         resultsDiv.innerHTML = users.map(user => `
-            <div class="search-result-item" onclick="viewProfile('${user.username}')">
-                <div class="search-result-avatar">${(user.displayName?.[0] || user.username?.[0]).toUpperCase()}</div>
+            <div class="search-result-item" onclick="viewProfile('${user.username}')" style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px;">
+                <div class="search-result-avatar" style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                    ${(user.displayName?.[0] || user.username?.[0]).toUpperCase()}
+                </div>
                 <div>
                     <strong>${escapeHtml(user.displayName || user.username)}</strong><br>
                     <small>@${escapeHtml(user.username)}</small>
@@ -1595,7 +1623,6 @@ window.viewBeat = viewBeat;
 window.downloadBeat = downloadBeat;
 window.deleteBeat = deleteBeat;
 window.deleteRecording = deleteRecording;
-window.deleteAccount = deleteAccount;
 window.voteForRecording = voteForRecording;
 window.viewProfile = viewProfile;
 window.followUser = followUser;
