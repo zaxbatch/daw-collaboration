@@ -232,12 +232,10 @@ function logout() {
     discoverMusic();
 }
 
-// ==================== DELETE FUNCTIONS ====================
+// ==================== API CALLS ====================
 
 async function deleteBeat(beatId) {
-    if (!confirm('Are you sure you want to delete this beat? All associated recordings will also be deleted.')) {
-        return;
-    }
+    if (!confirm('Are you sure you want to delete this beat?')) return;
     
     try {
         const token = localStorage.getItem('token');
@@ -246,12 +244,9 @@ async function deleteBeat(beatId) {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Delete failed');
-        }
+        if (!response.ok) throw new Error('Delete failed');
         
-        alert('Beat deleted successfully!');
+        alert('Beat deleted!');
         closeModal('beatModal');
         discoverMusic();
         if (currentUser) loadProfile(currentUser.username);
@@ -261,9 +256,7 @@ async function deleteBeat(beatId) {
 }
 
 async function deleteRecording(recordingId) {
-    if (!confirm('Are you sure you want to delete this recording?')) {
-        return;
-    }
+    if (!confirm('Delete this recording?')) return;
     
     try {
         const token = localStorage.getItem('token');
@@ -272,16 +265,11 @@ async function deleteRecording(recordingId) {
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Delete failed');
-        }
+        if (!response.ok) throw new Error('Delete failed');
         
-        alert('Recording deleted successfully!');
+        alert('Recording deleted!');
         closeModal('beatModal');
-        if (currentBeatId) {
-            viewBeat(currentBeatId);
-        }
+        if (currentBeatId) viewBeat(currentBeatId);
         if (currentUser) loadProfile(currentUser.username);
     } catch (error) {
         alert(error.message);
@@ -346,7 +334,6 @@ async function loadFeed() {
         }).join('');
     } catch (error) {
         console.error('Error loading feed:', error);
-        document.getElementById('feedContent').innerHTML = '<p>Error loading feed</p>';
     }
 }
 
@@ -370,7 +357,7 @@ async function loadTrending() {
         const trendingContent = document.getElementById('trendingContent');
         
         if (trending.length === 0) {
-            trendingContent.innerHTML = '<p>No trending content yet. Be the first!</p>';
+            trendingContent.innerHTML = '<p>No trending content yet.</p>';
             return;
         }
         
@@ -489,7 +476,7 @@ async function uploadBeat() {
     const file = document.getElementById('beatFile').files[0];
     
     if (!title || !bpm || !file) {
-        alert('Please fill all required fields (Title, BPM, and audio file)');
+        alert('Please fill all required fields');
         return;
     }
     
@@ -509,13 +496,9 @@ async function uploadBeat() {
             body: formData
         });
         
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Upload failed');
-        }
+        if (!response.ok) throw new Error('Upload failed');
         
         alert('Beat uploaded successfully!');
-        
         document.getElementById('beatTitle').value = '';
         document.getElementById('beatBpm').value = '';
         document.getElementById('beatTags').value = '';
@@ -554,7 +537,7 @@ async function viewBeat(beatId) {
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                 ${currentUser ? `
                     <button onclick="downloadBeat('${beat.id}')" class="download-btn">⬇️ Download Beat</button>
-                    <button onclick="openMultiTrackStudio('${beat.id}', '${escapeHtml(beat.title)}', '${API_URL}${beat.fileUrl}')" class="btn-primary">🎙️ Open in 8-Track Studio</button>
+                    <button onclick="openMultiTrackStudio('${beat.id}', '${escapeHtml(beat.title)}', '${beat.fileUrl}')" class="btn-primary">🎙️ Open in 8-Track Studio</button>
                 ` : '<p>Login to download or record</p>'}
                 ${currentUser && beat.producerId === currentUser.id ? `
                     <button onclick="deleteBeat('${beat.id}')" class="btn-danger">🗑️ Delete Beat</button>
@@ -563,7 +546,7 @@ async function viewBeat(beatId) {
             
             <h3 style="margin-top: 30px;">Vocal Versions (${beat.versions?.length || 0})</h3>
             <div id="versionsList">
-                ${!beat.versions || beat.versions.length === 0 ? '<p>No vocal versions yet. Be the first to record!</p>' : 
+                ${!beat.versions || beat.versions.length === 0 ? '<p>No vocal versions yet.</p>' : 
                   beat.versions.map(version => `
                     <div class="recording-item">
                         <div class="recording-header">
@@ -603,7 +586,6 @@ async function viewBeat(beatId) {
     }
 }
 
-// FIXED: Download beat with authentication
 async function downloadBeat(beatId) {
     if (!currentUser) {
         alert('Please login to download beats');
@@ -612,18 +594,13 @@ async function downloadBeat(beatId) {
     
     try {
         const token = localStorage.getItem('token');
-        // Use fetch with authentication instead of window.open
         const response = await fetch(`${API_URL}/api/beats/${beatId}/download`, {
             method: 'GET',
             headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Download failed');
-        }
+        if (!response.ok) throw new Error('Download failed');
         
-        // Get the blob and create download link
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -653,15 +630,13 @@ async function voteForRecording(recordingId) {
         });
         
         alert('Vote recorded!');
-        if (currentBeatId) {
-            viewBeat(currentBeatId);
-        }
+        if (currentBeatId) viewBeat(currentBeatId);
     } catch (error) {
         alert(error.message);
     }
 }
 
-// ==================== FIXED 8-TRACK DAW STUDIO ====================
+// ==================== 8-TRACK DAW STUDIO ====================
 
 async function loadBeatsForStudio() {
     try {
@@ -683,32 +658,31 @@ async function loadBeatsForStudio() {
                 <audio controls onclick="event.stopPropagation()">
                     <source src="${API_URL}${beat.fileUrl}" type="audio/mpeg">
                 </audio>
-                <button class="btn-primary" style="margin-top: 10px; width: 100%;" onclick="event.stopPropagation(); openMultiTrackStudio('${beat.id}', '${escapeHtml(beat.title)}', '${API_URL}${beat.fileUrl}')">
+                <button class="btn-primary" style="margin-top: 10px; width: 100%;" onclick="event.stopPropagation(); openMultiTrackStudio('${beat.id}', '${escapeHtml(beat.title)}', '${beat.fileUrl}')">
                     🎙️ Open in 8-Track Studio
                 </button>
             </div>
         `).join('');
     } catch (error) {
         console.error('Error loading beats for studio:', error);
-        const beatSelector = document.getElementById('beatSelector');
-        if (beatSelector) {
-            beatSelector.innerHTML = '<p>Error loading beats. Please make sure you are logged in.</p>';
-        }
     }
 }
 
-// FIXED: Open studio with better error handling
-async function openMultiTrackStudio(beatId, beatTitle, beatUrl) {
+// FIXED: Main function to open the 8-track studio
+async function openMultiTrackStudio(beatId, beatTitle, beatFileUrl) {
+    console.log('openMultiTrackStudio called with:', { beatId, beatTitle, beatFileUrl });
+    
     if (!currentUser) {
         alert('Please login to use the studio');
         return;
     }
     
-    console.log('Opening studio for beat:', beatId, beatTitle);
-    
     // Stop any playing audio
     if (isPlaying) stopPlayback();
-    if (isRecording) stopRecordingToTrack(currentTrackNumber);
+    if (isRecording && mediaRecorder) {
+        mediaRecorder.stop();
+        isRecording = false;
+    }
     
     // Close existing audio context
     if (audioContext) {
@@ -718,7 +692,7 @@ async function openMultiTrackStudio(beatId, beatTitle, beatUrl) {
     
     currentSession.beatId = beatId;
     currentSession.beatTitle = beatTitle;
-    currentSession.beatUrl = beatUrl;
+    currentSession.beatUrl = beatFileUrl;
     
     // Reset tracks
     initTracks();
@@ -726,11 +700,19 @@ async function openMultiTrackStudio(beatId, beatTitle, beatUrl) {
     // Initialize audio context
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     
-    // Load beat into track 0
+    // Construct the full URL for the beat file
+    const fullBeatUrl = beatFileUrl.startsWith('http') ? beatFileUrl : API_URL + beatFileUrl;
+    console.log('Loading beat from:', fullBeatUrl);
+    
     try {
-        console.log('Loading beat from:', beatUrl);
-        const response = await fetch(beatUrl);
-        if (!response.ok) throw new Error('Failed to load beat file');
+        const token = localStorage.getItem('token');
+        const response = await fetch(fullBeatUrl, {
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
         
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
@@ -751,10 +733,14 @@ async function openMultiTrackStudio(beatId, beatTitle, beatUrl) {
         renderTrackInterface();
         drawWaveform(0, audioBuffer);
         
-        console.log('Studio opened successfully');
+        console.log('Studio opened successfully!');
+        
+        // Switch to studio page
+        showPage('studio');
+        
     } catch (error) {
         console.error('Error loading beat:', error);
-        alert('Error loading beat file: ' + error.message);
+        alert('Error loading beat file: ' + error.message + '\n\nMake sure you are logged in.');
     }
 }
 
@@ -872,17 +858,12 @@ function updateTrackVolume(trackId, volume) {
 function toggleMute(trackId) {
     const track = currentSession.tracks[trackId];
     track.muted = !track.muted;
-    
-    if (track.muted) {
-        track.solo = false;
-    }
-    
+    if (track.muted) track.solo = false;
     renderTrackInterface();
 }
 
 function toggleSolo(trackId) {
     const track = currentSession.tracks[trackId];
-    
     if (track.solo) {
         track.solo = false;
     } else {
@@ -890,12 +871,11 @@ function toggleSolo(trackId) {
             t.solo = (t.id === trackId);
         });
     }
-    
     renderTrackInterface();
 }
 
 function clearTrack(trackId) {
-    if (confirm(`Clear track ${trackId}? This will remove the audio.`)) {
+    if (confirm(`Clear track ${trackId}?`)) {
         if (currentSession.tracks[trackId].audioUrl && currentSession.tracks[trackId].id !== 0) {
             URL.revokeObjectURL(currentSession.tracks[trackId].audioUrl);
         }
@@ -907,7 +887,7 @@ function clearTrack(trackId) {
 }
 
 function clearAllTracks() {
-    if (confirm('Clear ALL user tracks? The beat track will remain. This cannot be undone.')) {
+    if (confirm('Clear ALL user tracks?')) {
         for (let i = 1; i < 8; i++) {
             if (currentSession.tracks[i].audioUrl) {
                 URL.revokeObjectURL(currentSession.tracks[i].audioUrl);
@@ -922,8 +902,9 @@ function clearAllTracks() {
 
 function closeStudio() {
     if (confirm('Close studio? Unsaved recordings will be lost.')) {
-        if (isRecording) {
-            stopRecordingToTrack(currentTrackNumber);
+        if (isRecording && mediaRecorder) {
+            mediaRecorder.stop();
+            isRecording = false;
         }
         stopPlayback();
         if (audioContext) {
@@ -954,11 +935,11 @@ async function loadTrackFile(trackId, file) {
         drawWaveform(trackId, audioBuffer);
     } catch (error) {
         console.error('Error loading file:', error);
-        alert('Error loading audio file. Make sure it\'s a valid audio file.');
+        alert('Error loading audio file.');
     }
 }
 
-// ==================== PLAYBACK WITH SYNC ====================
+// ==================== PLAYBACK ====================
 
 async function startPlayback() {
     if (isPlaying) {
@@ -976,13 +957,11 @@ async function startPlayback() {
     
     const hasContent = currentSession.tracks.some(track => track.isLoaded);
     if (!hasContent) {
-        alert('No tracks to play. Load a beat and add some recordings!');
+        alert('No tracks to play.');
         return;
     }
     
-    if (playbackInterval) {
-        clearInterval(playbackInterval);
-    }
+    if (playbackInterval) clearInterval(playbackInterval);
     
     masterGainNode = audioContext.createGain();
     masterGainNode.gain.value = 1;
@@ -1017,11 +996,7 @@ async function startPlayback() {
         
         source.start(startTime);
         
-        trackSources.push({
-            source: source,
-            gainNode: gainNode,
-            trackId: track.id
-        });
+        trackSources.push({ source, gainNode, trackId: track.id });
     });
     
     isPlaying = true;
@@ -1031,18 +1006,14 @@ async function startPlayback() {
     playbackStartTime = Date.now();
     playbackInterval = setInterval(() => {
         const elapsed = (Date.now() - playbackStartTime) / 1000;
-        if (elapsed >= maxDuration) {
-            stopPlayback();
-        }
+        if (elapsed >= maxDuration) stopPlayback();
     }, 100);
 }
 
 function stopPlayback() {
     if (trackSources) {
         trackSources.forEach(track => {
-            try {
-                track.source.stop();
-            } catch (e) {}
+            try { track.source.stop(); } catch (e) {}
         });
         trackSources = [];
     }
@@ -1057,7 +1028,7 @@ function stopPlayback() {
     if (playBtn) playBtn.textContent = '▶️ Play All Tracks';
 }
 
-// ==================== RECORDING WITH BEAT PLAYBACK ====================
+// ==================== RECORDING ====================
 
 async function startRecordingToTrack(trackNumber) {
     if (!currentUser) {
@@ -1066,7 +1037,7 @@ async function startRecordingToTrack(trackNumber) {
     }
     
     if (isRecording) {
-        alert('Already recording! Stop the current recording first.');
+        alert('Already recording!');
         return;
     }
     
@@ -1080,17 +1051,13 @@ async function startRecordingToTrack(trackNumber) {
     
     currentTrackNumber = trackNumber;
     
-    // Ask for track name
     const trackName = prompt(`Name for Track ${trackNumber}:`, `Track ${trackNumber}`);
     if (trackName) {
         currentSession.tracks[trackNumber].name = trackName;
     }
     
     try {
-        // Get microphone access
         recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        
-        // Create media recorder
         mediaRecorder = new MediaRecorder(recordingStream);
         audioChunks = [];
         
@@ -1100,13 +1067,9 @@ async function startRecordingToTrack(trackNumber) {
         
         mediaRecorder.onstop = async () => {
             recordingBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            console.log('Recording complete, size:', recordingBlob.size);
-            
-            // Decode and save to track
             const arrayBuffer = await recordingBlob.arrayBuffer();
             const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
             
-            // Save to track
             if (currentSession.tracks[currentTrackNumber].audioUrl) {
                 URL.revokeObjectURL(currentSession.tracks[currentTrackNumber].audioUrl);
             }
@@ -1120,13 +1083,11 @@ async function startRecordingToTrack(trackNumber) {
             
             alert(`Recording saved to Track ${currentTrackNumber}!`);
             
-            // Clean up
             if (recordingStream) {
                 recordingStream.getTracks().forEach(track => track.stop());
                 recordingStream = null;
             }
             
-            // Update button
             const recordBtn = document.getElementById(`recordBtn-${currentTrackNumber}`);
             if (recordBtn) {
                 recordBtn.textContent = '🔴 Record';
@@ -1134,16 +1095,13 @@ async function startRecordingToTrack(trackNumber) {
                 recordBtn.onclick = () => startRecordingToTrack(currentTrackNumber);
             }
             
-            // Clear timer display
             const timerDisplay = document.getElementById('recordingTimerDisplay');
             if (timerDisplay) timerDisplay.textContent = 'Ready';
         };
         
-        // Start recording
         mediaRecorder.start();
         isRecording = true;
         
-        // Change button to recording state
         const recordBtn = document.getElementById(`recordBtn-${trackNumber}`);
         if (recordBtn) {
             recordBtn.textContent = '⏹️ Stop Recording';
@@ -1151,50 +1109,26 @@ async function startRecordingToTrack(trackNumber) {
             recordBtn.onclick = () => stopRecordingToTrack(trackNumber);
         }
         
-        // Start beat playback for monitoring
-        startMonitoringPlayback();
+        // Play beat for monitoring
+        if (currentSession.tracks[0].audioBuffer && !currentSession.tracks[0].muted) {
+            const beatSource = audioContext.createBufferSource();
+            beatSource.buffer = currentSession.tracks[0].audioBuffer;
+            const beatGain = audioContext.createGain();
+            beatGain.gain.value = currentSession.tracks[0].volume * 0.7;
+            beatSource.connect(beatGain);
+            beatGain.connect(audioContext.destination);
+            beatSource.start();
+            
+            if (!window.monitoringSources) window.monitoringSources = [];
+            window.monitoringSources.push(beatSource);
+        }
         
-        // Start timer
         recordingStartTime = Date.now();
         startRecordingTimer();
         
     } catch (error) {
         console.error('Error starting recording:', error);
         alert('Error accessing microphone. Please check permissions.');
-        if (recordingStream) {
-            recordingStream.getTracks().forEach(track => track.stop());
-            recordingStream = null;
-        }
-    }
-}
-
-function startMonitoringPlayback() {
-    // Play the beat track only for monitoring while recording
-    if (currentSession.tracks[0].audioBuffer && !currentSession.tracks[0].muted) {
-        const beatSource = audioContext.createBufferSource();
-        beatSource.buffer = currentSession.tracks[0].audioBuffer;
-        
-        const beatGain = audioContext.createGain();
-        beatGain.gain.value = currentSession.tracks[0].volume * 0.7;
-        
-        beatSource.connect(beatGain);
-        beatGain.connect(audioContext.destination);
-        beatSource.start();
-        
-        // Store for cleanup
-        if (!window.monitoringSources) window.monitoringSources = [];
-        window.monitoringSources.push(beatSource);
-    }
-}
-
-function stopMonitoringPlayback() {
-    if (window.monitoringSources) {
-        window.monitoringSources.forEach(source => {
-            try {
-                source.stop();
-            } catch (e) {}
-        });
-        window.monitoringSources = [];
     }
 }
 
@@ -1203,7 +1137,6 @@ function stopRecordingToTrack(trackNumber) {
         mediaRecorder.stop();
         isRecording = false;
         
-        // Reset button
         const recordBtn = document.getElementById(`recordBtn-${trackNumber}`);
         if (recordBtn) {
             recordBtn.textContent = '🔴 Record';
@@ -1211,16 +1144,18 @@ function stopRecordingToTrack(trackNumber) {
             recordBtn.onclick = () => startRecordingToTrack(trackNumber);
         }
         
-        // Stop monitoring playback
-        stopMonitoringPlayback();
+        if (window.monitoringSources) {
+            window.monitoringSources.forEach(source => {
+                try { source.stop(); } catch (e) {}
+            });
+            window.monitoringSources = [];
+        }
         
-        // Stop timer
         if (recordingTimer) {
             clearInterval(recordingTimer);
             recordingTimer = null;
         }
         
-        // Stop all playback
         stopPlayback();
     }
 }
@@ -1237,7 +1172,7 @@ function startRecordingTimer() {
     }, 1000);
 }
 
-// ==================== MIX AND EXPORT ====================
+// ==================== MIX AND SAVE ====================
 
 async function saveMultiTrackSession() {
     if (!currentSession.beatId) {
@@ -1247,7 +1182,7 @@ async function saveMultiTrackSession() {
     
     const hasUserRecordings = currentSession.tracks.slice(1).some(track => track.isLoaded);
     if (!hasUserRecordings) {
-        alert('No recordings to save. Please record something first!');
+        alert('No recordings to save.');
         return;
     }
     
@@ -1256,11 +1191,11 @@ async function saveMultiTrackSession() {
         return;
     }
     
-    const title = prompt('Enter a title for your recording:', `${currentUser.displayName}'s version of ${currentSession.beatTitle}`);
+    const title = prompt('Enter a title:', `${currentUser.displayName}'s version`);
     if (!title) return;
     
-    const description = prompt('Enter a description (optional):', '');
-    const tags = prompt('Enter tags (comma separated):', '');
+    const description = prompt('Enter a description:', '');
+    const tags = prompt('Enter tags:', '');
     
     stopPlayback();
     
@@ -1280,10 +1215,7 @@ async function saveMultiTrackSession() {
             body: formData
         });
         
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Upload failed');
-        }
+        if (!response.ok) throw new Error('Upload failed');
         
         alert('Recording saved successfully!');
         closeStudio();
@@ -1427,71 +1359,47 @@ async function viewProfile(username) {
         
         const profileContent = document.getElementById('profileContent');
         profileContent.innerHTML = `
-            <div class="profile-header" style="display: flex; gap: 30px; margin-bottom: 30px; flex-wrap: wrap;">
-                <div class="profile-avatar" style="width: 120px; height: 120px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 48px; font-weight: bold;">
-                    ${(user.displayName?.[0] || user.username?.[0]).toUpperCase()}
-                </div>
-                <div class="profile-info" style="flex: 1;">
-                    <div class="profile-name" style="font-size: 32px; font-weight: bold; margin-bottom: 10px;">${escapeHtml(user.displayName || user.username)}</div>
+            <div class="profile-header">
+                <div class="profile-avatar">${(user.displayName?.[0] || user.username?.[0]).toUpperCase()}</div>
+                <div class="profile-info">
+                    <div class="profile-name">${escapeHtml(user.displayName || user.username)}</div>
                     <div>@${escapeHtml(user.username)}</div>
-                    <div class="profile-stats" style="display: flex; gap: 20px; margin: 15px 0;">
-                        <div class="stat" style="text-align: center;">
-                            <div class="stat-number" style="font-size: 24px; font-weight: bold; color: #667eea;">${user.uploadedBeatsCount || 0}</div>
-                            <div class="stat-label" style="font-size: 12px; color: #666;">Beats</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-number" style="font-size: 24px; font-weight: bold; color: #667eea;">${user.recordingsCount || 0}</div>
-                            <div class="stat-label" style="font-size: 12px; color: #666;">Recordings</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-number" style="font-size: 24px; font-weight: bold; color: #667eea;">${user.followers?.length || 0}</div>
-                            <div class="stat-label" style="font-size: 12px; color: #666;">Followers</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-number" style="font-size: 24px; font-weight: bold; color: #667eea;">${user.points || 0}</div>
-                            <div class="stat-label" style="font-size: 12px; color: #666;">Points</div>
-                        </div>
+                    <div class="profile-stats">
+                        <div class="stat"><div class="stat-number">${user.uploadedBeatsCount || 0}</div><div class="stat-label">Beats</div></div>
+                        <div class="stat"><div class="stat-number">${user.recordingsCount || 0}</div><div class="stat-label">Recordings</div></div>
+                        <div class="stat"><div class="stat-number">${user.followers?.length || 0}</div><div class="stat-label">Followers</div></div>
+                        <div class="stat"><div class="stat-number">${user.points || 0}</div><div class="stat-label">Points</div></div>
                     </div>
-                    ${user.bio ? `<div class="profile-bio" style="margin: 15px 0; padding: 10px; background: #f5f5f5; border-radius: 8px;">${escapeHtml(user.bio)}</div>` : ''}
-                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                    ${user.bio ? `<div class="profile-bio">${escapeHtml(user.bio)}</div>` : ''}
+                    <div style="margin-top: 15px;">
                         ${currentUser && currentUser.id !== user.id ? 
-                            `<button onclick="followUser('${user.id}')" class="follow-btn" style="background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 25px; cursor: pointer;">➕ Follow</button>` : ''}
+                            `<button onclick="followUser('${user.id}')" class="follow-btn">➕ Follow</button>` : ''}
                         ${currentUser && currentUser.id === user.id ? 
-                            `<button onclick="deleteAccount()" class="btn-danger" style="background: #ff4757; color: white; padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer;">🗑️ Delete Account</button>` : ''}
+                            `<button onclick="deleteAccount()" class="btn-danger">🗑️ Delete Account</button>` : ''}
                     </div>
                 </div>
             </div>
             <h3>Uploaded Beats</h3>
-            <div class="beats-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px;">
+            <div class="beats-grid">
                 ${user.uploadedBeats?.map(beat => `
-                    <div class="beat-card" onclick="viewBeat('${beat.id}')" style="background: #f9f9f9; border-radius: 10px; padding: 20px; cursor: pointer;">
+                    <div class="beat-card" onclick="viewBeat('${beat.id}')">
                         <div class="beat-title">${escapeHtml(beat.title)}</div>
                         <div class="beat-info">${beat.genre} • ${beat.bpm} BPM</div>
                         <audio controls onclick="event.stopPropagation()">
                             <source src="${API_URL}${beat.fileUrl}" type="audio/mpeg">
                         </audio>
-                        ${currentUser && currentUser.id === beat.producerId ? `
-                            <button class="btn-danger" style="margin-top: 10px;" onclick="event.stopPropagation(); deleteBeat('${beat.id}')">
-                                🗑️ Delete Beat
-                            </button>
-                        ` : ''}
                     </div>
                 `).join('') || '<p>No beats uploaded yet</p>'}
             </div>
             <h3>Recordings</h3>
             <div class="beats-grid">
                 ${user.recordings?.map(recording => `
-                    <div class="beat-card" onclick="viewRecording('${recording.id}')" style="background: #f9f9f9; border-radius: 10px; padding: 20px; cursor: pointer;">
+                    <div class="beat-card" onclick="viewRecording('${recording.id}')">
                         <div class="beat-title">${escapeHtml(recording.title)}</div>
                         <div class="beat-info">⭐ ${recording.rating?.toFixed(1) || 0}/5</div>
                         <audio controls onclick="event.stopPropagation()">
                             <source src="${API_URL}${recording.fileUrl}" type="audio/mpeg">
                         </audio>
-                        ${currentUser && currentUser.id === recording.vocalistId ? `
-                            <button class="btn-danger" style="margin-top: 10px;" onclick="event.stopPropagation(); deleteRecording('${recording.id}')">
-                                🗑️ Delete Recording
-                            </button>
-                        ` : ''}
                     </div>
                 `).join('') || '<p>No recordings yet</p>'}
             </div>
@@ -1503,17 +1411,11 @@ async function viewProfile(username) {
     }
 }
 
-async function loadProfile(username) {
-    await viewProfile(username);
-}
-
 async function followUser(userId) {
     try {
         await apiCall(`/api/users/${userId}/follow`, { method: 'POST' });
         alert('Followed!');
-        if (currentUser) {
-            viewProfile(currentUser.username);
-        }
+        if (currentUser) viewProfile(currentUser.username);
     } catch (error) {
         alert(error.message);
     }
@@ -1521,18 +1423,40 @@ async function followUser(userId) {
 
 async function viewRecording(recordingId) {
     try {
-        const recording = await apiCall(`/api/recordings/${recordingId}`);
         const beats = await apiCall('/api/beats');
         const beat = beats.find(b => b.versions.some(v => v.id === recordingId));
-        if (beat) {
-            viewBeat(beat.id);
-        }
+        if (beat) viewBeat(beat.id);
     } catch (error) {
         alert(error.message);
     }
 }
 
-// ==================== SEARCH FUNCTIONS ====================
+async function deleteAccount() {
+    if (!confirm('Type "DELETE" to confirm account deletion:')) return;
+    const confirmation = prompt('Type "DELETE" to confirm:');
+    if (confirmation !== 'DELETE') return;
+    
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_URL}/api/users/${currentUser.id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error('Delete failed');
+        
+        localStorage.removeItem('token');
+        currentUser = null;
+        updateUI();
+        showPage('discover');
+        discoverMusic();
+        alert('Account deleted');
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+// ==================== SEARCH ====================
 
 async function handleGlobalSearch(event) {
     const query = event.target.value;
@@ -1552,10 +1476,8 @@ async function handleGlobalSearch(event) {
         }
         
         resultsDiv.innerHTML = users.map(user => `
-            <div class="search-result-item" onclick="viewProfile('${user.username}')" style="padding: 10px 15px; cursor: pointer; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px;">
-                <div class="search-result-avatar" style="width: 40px; height: 40px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
-                    ${(user.displayName?.[0] || user.username?.[0]).toUpperCase()}
-                </div>
+            <div class="search-result-item" onclick="viewProfile('${user.username}')">
+                <div class="search-result-avatar">${(user.displayName?.[0] || user.username?.[0]).toUpperCase()}</div>
                 <div>
                     <strong>${escapeHtml(user.displayName || user.username)}</strong><br>
                     <small>@${escapeHtml(user.username)}</small>
@@ -1569,24 +1491,22 @@ async function handleGlobalSearch(event) {
     }
 }
 
+// Close search results when clicking outside
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-bar')) {
+        document.getElementById('searchResults').classList.remove('active');
+    }
+});
+
 // ==================== HELPER FUNCTIONS ====================
 
 function timeAgo(date) {
     const seconds = Math.floor((new Date() - new Date(date)) / 1000);
-    const intervals = {
-        year: 31536000,
-        month: 2592000,
-        week: 604800,
-        day: 86400,
-        hour: 3600,
-        minute: 60
-    };
+    const intervals = { year: 31536000, month: 2592000, week: 604800, day: 86400, hour: 3600, minute: 60 };
     
     for (const [unit, secondsInUnit] of Object.entries(intervals)) {
         const interval = Math.floor(seconds / secondsInUnit);
-        if (interval >= 1) {
-            return `${interval} ${unit}${interval === 1 ? '' : 's'} ago`;
-        }
+        if (interval >= 1) return `${interval} ${unit}${interval === 1 ? '' : 's'} ago`;
     }
     return 'just now';
 }
@@ -1606,13 +1526,8 @@ function closeModal(modalId) {
     document.getElementById(modalId).classList.remove('active');
 }
 
-function showLoginModal() {
-    showModal('loginModal');
-}
-
-function showRegisterModal() {
-    showModal('registerModal');
-}
+function showLoginModal() { showModal('loginModal'); }
+function showRegisterModal() { showModal('registerModal'); }
 
 // Make functions global
 window.register = register;

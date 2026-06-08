@@ -8,7 +8,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <div class="header">
             <div class="logo">🎵 8-Track DAW Collaboration Studio</div>
             <div class="search-bar">
@@ -18,7 +17,6 @@
             <div id="authSection"></div>
         </div>
 
-        <!-- Navigation -->
         <div class="nav-tabs" id="navTabs">
             <div class="nav-tab active" data-page="feed">📱 Feed</div>
             <div class="nav-tab" data-page="discover">🔍 Discover</div>
@@ -29,15 +27,12 @@
             <div class="nav-tab" data-page="profile">👤 Profile</div>
         </div>
 
-        <!-- Content Pages -->
         <div class="content">
-            <!-- Feed Page -->
             <div id="feedPage" class="page active">
                 <h2>Your Feed</h2>
                 <div id="feedContent"></div>
             </div>
 
-            <!-- Discover Page -->
             <div id="discoverPage" class="page">
                 <h2>Discover Music</h2>
                 <div class="filters">
@@ -60,19 +55,16 @@
                 <div id="discoverContent" class="beats-grid"></div>
             </div>
 
-            <!-- Trending Page -->
             <div id="trendingPage" class="page">
                 <h2>Trending Now</h2>
                 <div id="trendingContent"></div>
             </div>
 
-            <!-- Leaderboard Page -->
             <div id="leaderboardPage" class="page">
                 <h2>Top Creators</h2>
                 <div id="leaderboardContent"></div>
             </div>
 
-            <!-- 8-Track Studio Page -->
             <div id="studioPage" class="page">
                 <h2>🎙️ 8-Track Recording Studio</h2>
                 <div id="studioContent">
@@ -92,7 +84,6 @@
                 </div>
             </div>
 
-            <!-- Upload Beat Page -->
             <div id="uploadPage" class="page">
                 <h2>Upload Your Beat</h2>
                 <div class="upload-form">
@@ -106,44 +97,15 @@
                         <option value="Jazz">Jazz</option>
                     </select>
                     <input type="number" id="beatBpm" placeholder="BPM" required>
-                    <input type="text" id="beatTags" placeholder="Tags (comma separated: chill, trap, lo-fi)">
+                    <input type="text" id="beatTags" placeholder="Tags (comma separated)">
                     <textarea id="beatDescription" rows="3" placeholder="Description"></textarea>
                     <input type="file" id="beatFile" accept="audio/*" required>
                     <button onclick="uploadBeat()" class="btn-primary">Upload Beat</button>
                 </div>
             </div>
 
-            <!-- Profile Page -->
             <div id="profilePage" class="page">
                 <div id="profileContent"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Multi-Track Recording Modal -->
-    <div id="recordTrackModal" class="modal">
-        <div class="modal-content" style="max-width: 600px;">
-            <div class="modal-header">🎙️ Record Track <span id="trackNumber"></span></div>
-            <div id="trackRecordInfo"></div>
-            
-            <div class="daw-controls">
-                <h3>Record Your Part</h3>
-                <button id="startTrackRecordingBtn" class="btn-primary" onclick="startTrackRecording()">🔴 Start Recording</button>
-                <button id="stopTrackRecordingBtn" class="btn-secondary" onclick="stopTrackRecording()" style="display:none;">⏹️ Stop Recording</button>
-                <div id="trackRecordingTimer" style="margin: 10px 0; font-size: 24px; font-weight: bold; text-align: center;">00:00</div>
-                <audio id="recordedTrackAudio" controls style="display:none; width: 100%; margin: 10px 0;"></audio>
-                
-                <hr style="margin: 20px 0;">
-                
-                <h3>Or Upload Audio File</h3>
-                <input type="file" id="trackAudioFile" accept="audio/*" onchange="handleTrackFileUpload()">
-            </div>
-            
-            <input type="text" id="trackName" placeholder="Track Name (e.g., Verse 1, Chorus, Ad-libs)">
-            
-            <div style="margin-top: 20px;">
-                <button onclick="saveTrackRecording()" class="btn-primary">Save to Track</button>
-                <button onclick="closeModal('recordTrackModal')" class="btn-secondary">Cancel</button>
             </div>
         </div>
     </div>
