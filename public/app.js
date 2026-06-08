@@ -1,6 +1,6 @@
 // Configuration
 //const API_URL = window.location.origin;
-const API_URL = https://daw-studio-backend.onrender.com';
+const API_URL = 'https://daw-collaboration.onrender.com/';
 
 let currentUser = null;
 let currentBeatId = null;
