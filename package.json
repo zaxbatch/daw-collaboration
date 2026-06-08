@@ -1,13 +1,13 @@
 {
-  "name": "daw-collaboration-app",
+  "name": "daw-collaboration-studio",
   "version": "1.0.0",
-  "description": "Community Collaboration DAW - Upload beats, record vocals, vote for best versions",
+  "description": "8-Track DAW Collaboration Studio - Record, produce, and collaborate",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
-  "keywords": ["daw", "music", "collaboration", "beats", "vocals"],
+  "keywords": ["daw", "music", "recording", "collaboration", "8-track"],
   "author": "",
   "license": "MIT",
   "dependencies": {
